@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gym Face Access System</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #1a1a2e;
+      color: white;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    h1 {
+      font-size: 28px;
+      margin: 20px 0 5px;
+      color: #00d4ff;
+    }
+    p.subtitle {
+      color: #aaa;
+      margin-bottom: 20px;
+      font-size: 14px;
+    }
+    .container {
+      background: #16213e;
+      border-radius: 16px;
+      padding: 24px;
+      width: 100%;
+      max-width: 480px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    }
+    video, canvas {
+      width: 100%;
+      border-radius: 12px;
+      background: #000;
+    }
+    canvas { display: none; }
+    .tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .tab {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: bold;
+      background: #0f3460;
+      color: #aaa;
+      transition: all 0.2s;
+    }
+    .tab.active {
+      background: #00d4ff;
+      color: #1a1a2e;
+    }
+    .section { display: none; }
+    .section.active { display: block; }
+    input[type="text"] {
+      width: 100%;
+      padding: 12px;
+      margin: 8px 0;
+      border-radius: 8px;
+      border: 1px solid #0f3460;
+      background: #0f3460;
+      color: white;
+      font-size: 14px;
+    }
+    select {
+      width: 100%;
+      padding: 12px;
+      margin: 8px 0;
+      border-radius: 8px;
+      border: 1px solid #0f3460;
+      background: #0f3460;
+      color: white;
+      font-size: 14px;
+    }
+    button.action-btn {
+      width: 100%;
+      padding: 14px;
+      margin-top: 12px;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-register { background: #00d4ff; color: #1a1a2e; }
+    .btn-verify { background: #00ff88; color: #1a1a2e; }
+    .btn-capture { background: #0f3460; color: white; margin-top: 8px; }
+    .result {
+      margin-top: 16px;
+      padding: 16px;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: bold;
+      text-align: center;
+      display: none;
+    }
+    .result.granted {
+      background: rgba(0, 255, 136, 0.15);
+      border: 2px solid #00ff88;
+      color: #00ff88;
+    }
+    .result.denied {
+      background: rgba(255, 60, 60, 0.15);
+      border: 2px solid #ff3c3c;
+      color: #ff3c3c;
+    }
+    .result.info {
+      background: rgba(0, 212, 255, 0.15);
+      border: 2px solid #00d4ff;
+      color: #00d4ff;
+    }
+    .captured-preview {
+      width: 100%;
+      border-radius: 12px;
+      margin-top: 8px;
+      display: none;
+    }
+    label {
+      font-size: 13px;
+      color: #aaa;
+      margin-top: 8px;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🏋️ GymFace</h1>
+  <p class="subtitle">Serverless Face Recognition Access System</p>
+
+  <div class="container">
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('verify')">Verify Access</button>
+      <button class="tab" onclick="switchTab('register')">Register Member</button>
+    </div>
+
+    <!-- VERIFY SECTION -->
+    <div class="section active" id="verify-section">
+      <video id="verify-video" autoplay playsinline></video>
+      <canvas id="verify-canvas"></canvas>
+      <img class="captured-preview" id="verify-preview"/>
+      <button class="action-btn btn-capture" onclick="captureImage('verify')">📸 Capture Face</button>
+      <button class="action-btn btn-verify" onclick="verifyAccess()">🔍 Verify Access</button>
+      <div class="result" id="verify-result"></div>
+    </div>
+
+    <!-- REGISTER SECTION -->
+    <div class="section" id="register-section">
+      <label>Member Name</label>
+      <input type="text" id="member-name" placeholder="Enter full name"/>
+      <label>Membership Type</label>
+      <select id="membership-type">
+        <option value="basic">Basic</option>
+        <option value="premium">Premium</option>
+      </select>
+      <label>Membership Expiry</label>
+      <input type="text" id="membership-expiry" placeholder="YYYY-MM-DD" value="2026-12-31"/>
+      <video id="register-video" autoplay playsinline style="margin-top:12px"></video>
+      <canvas id="register-canvas"></canvas>
+      <img class="captured-preview" id="register-preview"/>
+      <button class="action-btn btn-capture" onclick="captureImage('register')">📸 Capture Face</button>
+      <button class="action-btn btn-register" onclick="registerMember()">✅ Register Member</button>
+      <div class="result" id="register-result"></div>
+    </div>
+  </div>
+
+  <script>
+    const API = 'https://ji5txqbe25.execute-api.ap-south-1.amazonaws.com';
+    let capturedImages = { verify: null, register: null };
+
+    async function startCamera(videoId) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        document.getElementById(videoId).srcObject = stream;
+      } catch(e) {
+        alert('Camera access denied! Please allow camera access.');
+      }
+    }
+
+    startCamera('verify-video');
+    startCamera('register-video');
+
+    function switchTab(tab) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+      document.getElementById(tab + '-section').classList.add('active');
+      event.target.classList.add('active');
+    }
+
+    function captureImage(type) {
+      const video = document.getElementById(type + '-video');
+      const canvas = document.getElementById(type + '-canvas');
+      const preview = document.getElementById(type + '-preview');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext('2d').drawImage(video, 0, 0);
+      const imageData = canvas.toDataURL('image/jpeg').split(',')[1];
+      capturedImages[type] = imageData;
+      preview.src = 'data:image/jpeg;base64,' + imageData;
+      preview.style.display = 'block';
+    }
+
+    async function verifyAccess() {
+      if (!capturedImages.verify) {
+        showResult('verify', 'info', '📸 Please capture your face first!');
+        return;
+      }
+      showResult('verify', 'info', '🔍 Verifying...');
+      try {
+        const res = await fetch(API + '/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: capturedImages.verify })
+        });
+        const data = await res.json();
+        if (data.access === 'GRANTED') {
+          showResult('verify', 'granted',
+            '✅ ACCESS GRANTED\n👤 ' + data.member +
+            '\n🏅 ' + data.membership +
+            '\n🎯 Match: ' + data.confidence);
+        } else {
+          showResult('verify', 'denied',
+            '❌ ACCESS DENIED\n⚠️ ' + (data.reason || 'Unknown error'));
+        }
+      } catch(e) {
+        showResult('verify', 'denied', '❌ Error: ' + e.message);
+      }
+    }
+
+    async function registerMember() {
+      const name = document.getElementById('member-name').value.trim();
+      const membership_type = document.getElementById('membership-type').value;
+      const membership_expiry = document.getElementById('membership-expiry').value;
+      if (!name) { showResult('register', 'info', '⚠️ Please enter member name!'); return; }
+      if (!capturedImages.register) { showResult('register', 'info', '📸 Please capture face first!'); return; }
+      showResult('register', 'info', '⏳ Registering member...');
+      try {
+        const res = await fetch(API + '/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name,
+            membership_type,
+            membership_expiry,
+            image: capturedImages.register
+          })
+        });
+        const data = await res.json();
+        if (data.member_id) {
+          showResult('register', 'granted',
+            '✅ REGISTERED!\n👤 ' + name +
+            '\n🆔 ID: ' + data.member_id.substring(0,8) + '...');
+        } else {
+          showResult('register', 'denied', '❌ ' + (data.message || data.error));
+        }
+      } catch(e) {
+        showResult('register', 'denied', '❌ Error: ' + e.message);
+      }
+    }
+
+    function showResult(type, status, message) {
+      const el = document.getElementById(type + '-result');
+      el.className = 'result ' + status;
+      el.style.display = 'block';
+      el.style.whiteSpace = 'pre-line';
+      el.textContent = message;
+    }
+  </script>
+</body>
+</html>
