@@ -43,6 +43,12 @@ The frontend is fully functional and demonstrates the complete user flow (camera
 - Designing a REST API contract between a static frontend and serverless backend
 - Structuring async fetch calls with proper error handling and user-facing status states (granted/denied/info)
 
+
+## Live Demo
+
+🔗 [https://unknown298.github.io/gym_face_access/](https://unknown298.github.io/gym_face_access/)
+
+*Note: The UI and camera capture flow are fully functional. Since the AWS backend resources are currently inactive, the Verify/Register API calls will not complete — see Project Status below for details.*
 ## Running Locally
 
 Since this is a static frontend, simply open `index.html` in a browser. Note: the API calls to `/verify` and `/register` require the backend AWS resources to be active — see Project Status above.
